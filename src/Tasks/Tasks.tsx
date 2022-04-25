@@ -1,32 +1,59 @@
-import React, {useState} from 'react';
-import {
-	useToast,
-} from 'native-base';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useToast } from 'native-base';
 
-import TasksView from './TasksView'
+import TasksView from './TasksView';
+import type { Tasks, Task } from '../types/Tasks';
 
-export type Task = {
-	id: number;
-	name: string;
-	description: string;
-	isCompleted: boolean;
-};
-export type Tasks = Task[];
+const TASK_STORAGE_KEY = '@TasksApp:tasks';
 
-let initialTasks = require('../tasks.json');
-
-export default function Tasks() {
-	const [tasks, setTasks] = useState<Tasks | []>(initialTasks);
-	const [inputValue, setInputValue] = useState<string>('');
-
+export default function TasksComponent() {
 	const toast = useToast();
 
+	const [tasks, setTasks] = useState<Tasks | [any]>([]);
+	const [inputValue, setInputValue] = useState<string>('');
+	const [loadingTasks, setLoadingTasks] = useState(true)
+
+	useEffect(() => {
+		getTasks();
+	}, []);
+
+	useEffect(() => {
+		storeTasks();
+	}, [tasks]);
+
+	const getTasks = async () => {
+		setLoadingTasks(true)
+		try {
+			const tasksStoraged = await AsyncStorage.getItem(TASK_STORAGE_KEY);
+			if (tasksStoraged !== null) {
+				setTasks(JSON.parse(tasksStoraged));
+			}
+		} catch (e) {
+			toast.show({
+				description: 'Error geting tasks',
+				placement: 'top'
+			});
+		}
+		setLoadingTasks(false)
+	};
+	const storeTasks = async () => {
+		try {
+			await AsyncStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
+		} catch (e) {
+			toast.show({
+				description: 'Error saving tasks',
+				placement: 'top'
+			});
+		}
+	};
+
 	function handleDeleteTask(id: number) {
-		setTasks(tasks.filter(task => task.id !== id));
+		setTasks(tasks.filter((task) => task.id !== id));
 	}
 
 	function handleCompleteTask(id: number) {
-		const index = tasks.findIndex(task => task.id === id);
+		const index = tasks.findIndex((task) => task.id === id);
 		const tasksAux = [...tasks];
 		tasksAux[index].isCompleted = !tasks[index].isCompleted;
 		setTasks(tasksAux);
@@ -37,21 +64,20 @@ export default function Tasks() {
 			setTasks([
 				...tasks,
 				{
-					id: tasks.length + 1,
+					id: tasks.length ? tasks[tasks.length - 1].id + 1 : 0,
 					name: inputValue,
-					description: '',
-					isCompleted: false,
-				},
+					isCompleted: false
+				}
 			]);
-            setInputValue('');
-            toast.show({
-                description: 'Task created corretly',
-                placement: 'top',
-            })
+			setInputValue('');
+			toast.show({
+				description: 'Task created corretly',
+				placement: 'top'
+			});
 		} else {
-            toast.show({
-                description: 'Please, enter a task name'
-            })
+			toast.show({
+				description: 'Please, enter a task name'
+			});
 		}
 	}
 
@@ -60,13 +86,14 @@ export default function Tasks() {
 	}
 
 	return (
-		<TasksView 
+		<TasksView
 			tasks={tasks}
+			loadingTasks={loadingTasks}
 			inputValue={inputValue}
 			handleAddTask={handleAddTask}
 			handleDeleteTask={handleDeleteTask}
 			handleCompleteTask={handleCompleteTask}
 			handleChangeInputValue={handleChangeInputValue}
-		/> 
+		/>
 	);
 }
